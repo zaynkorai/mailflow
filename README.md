@@ -1,2 +1,2 @@
-# emaila
-email agent
+# Mailflow
+### Email Automation with AI Agents  🚀 

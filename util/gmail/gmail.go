@@ -29,19 +29,17 @@ const (
 )
 
 var (
-	// SCOPES defines the access level for the Gmail API.
-	// 'gmail.modify' allows reading, composing, and sending messages.
 	SCOPES = []string{gmail.GmailModifyScope}
 )
 
 type EmailInfo struct {
-	ID         string
-	ThreadID   string
-	MessageID  string
-	References string
-	Sender     string
-	Subject    string
-	Body       string
+	ID         string `json:"id"`
+	ThreadID   string `json:"threadId"`
+	MessageID  string `json:"messageId"`
+	References string `json:"references"`
+	Sender     string `json:"sender"`
+	Subject    string `json:"subject"`
+	Body       string `json:"body"`
 }
 
 type DraftInfo struct {
@@ -55,7 +53,6 @@ type GmailUtils struct {
 	myEmail string // Stores the user's own email address for skipping self-sent emails.
 }
 
-// This handles the OAuth2 authentication flow to get a Gmail service client.
 func NewGmailUtils() (*GmailUtils, error) {
 	ctx := context.Background()
 
@@ -89,7 +86,6 @@ func NewGmailUtils() (*GmailUtils, error) {
 	return &GmailUtils{service: srv, myEmail: myEmail}, nil
 }
 
-// getToken retrieves a token from a local file or by prompting the user for authorization.
 func getToken(config *oauth2.Config) (*oauth2.Token, error) {
 	tok, err := tokenFromFile(tokenFile)
 	if err != nil {
@@ -99,7 +95,6 @@ func getToken(config *oauth2.Config) (*oauth2.Token, error) {
 	return tok, nil
 }
 
-// getTokenFromWeb prompts the user to authorize the application and retrieves an access token.
 func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	fmt.Printf("Go to the following link in your browser then type the authorization code: \n%v\n", authURL)
@@ -116,7 +111,6 @@ func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
 	return tok
 }
 
-// tokenFromFile retrieves a token from a specified file path.
 func tokenFromFile(file string) (*oauth2.Token, error) {
 	f, err := os.Open(file)
 	if err != nil {
@@ -173,7 +167,7 @@ func (gut *GmailUtils) FetchUnansweredEmails(maxResults int64) ([]EmailInfo, err
 			emailInfo, err := gut.GetEmailInfo(email.Id)
 			if err != nil {
 				log.Printf("Error getting email info for ID %s: %v", email.Id, err)
-				continue // Skip this email but continue processing others
+				continue
 			}
 
 			if gut.ShouldSkipEmail(emailInfo) {
@@ -277,12 +271,10 @@ func (gut *GmailUtils) createReplyMessage(email EmailInfo, replyText string, sen
 
 	if email.MessageID != "" {
 		msg.Header["In-Reply-To"] = []string{email.MessageID}
-		// Combine existing references with the original message ID
 		references := strings.TrimSpace(fmt.Sprintf("%s %s", email.References, email.MessageID))
 		msg.Header["References"] = []string{references}
 
 		if send {
-			// Generate a new Message-ID for this reply
 			msg.Header["Message-ID"] = []string{fmt.Sprintf("<%s@gmail.com>", uuid.New().String())}
 		}
 	}
@@ -293,8 +285,8 @@ func (gut *GmailUtils) createReplyMessage(email EmailInfo, replyText string, sen
 			rawEmail.WriteString(fmt.Sprintf("%s: %s\r\n", k, s))
 		}
 	}
-	rawEmail.WriteString("\r\n")      // End of headers
-	rawEmail.WriteString(bodyContent) // Add the body content
+	rawEmail.WriteString("\r\n")
+	rawEmail.WriteString(bodyContent)
 
 	raw := base64.URLEncoding.EncodeToString([]byte(rawEmail.String()))
 
@@ -306,7 +298,7 @@ func (gut *GmailUtils) createReplyMessage(email EmailInfo, replyText string, sen
 
 func (gut *GmailUtils) ShouldSkipEmail(emailInfo EmailInfo) bool {
 	if gut.myEmail == "" {
-		return false // Cannot skip if MY_EMAIL is not set
+		return false
 	}
 	return strings.Contains(emailInfo.Sender, gut.myEmail)
 }
@@ -407,7 +399,7 @@ func (gut *GmailUtils) extractMainContentFromHTML(htmlContent string) string {
 }
 
 func (gut *GmailUtils) cleanBodyText(text string) string {
-	// Replace all whitespace sequences (including newlines, tabs, etc.) with a single space
+
 	reSpaces := regexp.MustCompile(`\s+`)
 	cleanedText := reSpaces.ReplaceAllString(text, " ")
 	return strings.TrimSpace(cleanedText)
@@ -456,8 +448,7 @@ func (gut *GmailUtils) createHTMLEmailMessage(recipient, subject, replyText stri
 	}
 	qpWriter.Close()
 
-	mw.Close() // Close the multipart writer to finalize the body
+	mw.Close()
 
-	// Return the mail.Message headers and the generated body content as a string
 	return msg, b.String(), nil
 }

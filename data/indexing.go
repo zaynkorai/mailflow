@@ -24,7 +24,6 @@ const RAG_SEARCH_PROMPT_TEMPLATE = `
 	Context: %s
 	`
 
-// Document represents a chunk of text from a document.
 type Document struct {
 	Content   string
 	Embedding []float32
@@ -96,7 +95,7 @@ func CosineSimilarity(vec1, vec2 []float32) float64 {
 
 // Retrieve performs a semantic search on the vector store and returns the topN most similar documents.
 func (s *SimpleVectorStore) Retrieve(ctx context.Context, query string, topN int) ([]Document, error) {
-	queryResp, err := s.embeddingModel.EmbedContent(ctx, genai.Text(query)) // Use embeddingModel
+	queryResp, err := s.embeddingModel.EmbedContent(ctx, genai.Text(query))
 	if err != nil {
 		return nil, fmt.Errorf("failed to embed query: %w", err)
 	}
@@ -116,8 +115,6 @@ func (s *SimpleVectorStore) Retrieve(ctx context.Context, query string, topN int
 		scoredDocs = append(scoredDocs, ScoredDocument{Document: doc, Score: score})
 	}
 
-	// Sort by score (descending) - simple bubble sort for small N,
-	// for larger datasets, use sort.Sort interface.
 	for i := 0; i < len(scoredDocs)-1; i++ {
 		for j := i + 1; j < len(scoredDocs); j++ {
 			if scoredDocs[i].Score < scoredDocs[j].Score {
@@ -195,7 +192,6 @@ func main() {
 	fmt.Printf("Split into %d chunks.\n", len(docChunks))
 
 	fmt.Println("Creating vector embeddings & storing in memory...")
-	// Add chunks to the vector store (embed and store)
 	for i, chunk := range docChunks {
 		err := vectorstore.AddDocument(ctx, chunk)
 		if err != nil {
@@ -204,11 +200,9 @@ func main() {
 	}
 	fmt.Println("Vector embeddings created and stored.")
 
-	// Test RAG chain
 	fmt.Println("Test RAG chain...")
 	query := "What are your pricing options?"
 
-	// 1. Retrieve relevant context
 	retrievedDocs, err := vectorstore.Retrieve(ctx, query, 3) // Retrieve top 3 documents
 	if err != nil {
 		log.Fatalf("Failed to retrieve documents: %v", err)

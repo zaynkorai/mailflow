@@ -150,7 +150,7 @@ func (n *Nodes) MustRewrite(ctx context.Context, state *GraphState) (*GraphState
 		}
 		state.WriterMessages = []string{}
 		return state, "send", nil
-	} else if state.Trials >= 3 {
+	} else if state.Trials >= 5 {
 		fmt.Println(color.RedString("Email is not good, we reached max trials must stop!!!"))
 		if len(state.EmailsInfo) > 0 {
 			state.EmailsInfo = state.EmailsInfo[:len(state.EmailsInfo)-1]

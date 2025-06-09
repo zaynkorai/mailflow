@@ -93,7 +93,16 @@ This is the detailed flow of the system:
 
 ### Running the Application
 
-1.  **Start the workflow (console application):**
+1.  **Indexing RAG (console application):**
+
+    Fill out agency/company data in `data/agency.txt` and run given command
+
+    ```sh
+    go run data/indexing.go
+    ```
+
+
+2.  **Start the workflow (console application):**
 
     ```sh
     go run main.go

@@ -7,16 +7,36 @@ import (
 	"os"
 	"path/filepath"
 
+	"mailflow/internals/config"
 	"mailflow/internals/data"
+	"mailflow/internals/llm"
+	"mailflow/internals/rag"
+	"mailflow/internals/rag/adapter"
+	"mailflow/pkg/logging"
 
 	"github.com/gorilla/mux"
 )
 
 func main() {
+	logging.InitLogger()
+	logging.Info("Starting Mailflow API service...")
 
-	svc := data.NewDataUploadService()
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		logging.Fatal("Failed to load configuration: %v", err)
+	}
+	logging.Info("Configuration loaded successfully. Port: %d, Google API Key: %s (first 5 chars)", cfg.Port, cfg.GoogleAPIKey[:5])
 
-	endpoints := data.NewEndpoints(svc)
+	geminiEmbedder := llm.NewGeminiEmbedder(cfg.GoogleAPIKey)
+	vectorStore := adapter.NewInMemoryVectorStore()
+	chunker := rag.NewSimpleTextChunker(rag.DefaultChunkSize, rag.DefaultChunkOverlap)
+	ragSystem := rag.NewRAGSystem(chunker, geminiEmbedder, vectorStore)
+	logging.Info("RAG system initialized for API service.")
+
+	dataSvc := data.NewDataUploadService(ragSystem)
+	logging.Info("Data upload service initialized for API service.")
+
+	endpoints := data.NewEndpoints(dataSvc)
 
 	r := mux.NewRouter()
 	data.MakeHTTPHandler(r, endpoints)

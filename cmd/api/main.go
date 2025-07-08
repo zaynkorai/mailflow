@@ -1,78 +1,46 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"time"
+	"path/filepath"
 
-	"github.com/zaynkorai/mailflow/internals/ai"
-	"github.com/zaynkorai/mailflow/util/gmail"
+	"mailflow/internals/data"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
-	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
-	if googleAPIKey == "" {
-		log.Fatal("Error: GOOGLE_API_KEY environment variable is NOT set. Please set it.")
-	}
 
-	ctx := context.Background()
-	workflowApp, err := ai.NewWorkflow(ctx, googleAPIKey)
-	if err != nil {
-		log.Fatalf("Failed to set up the workflow: %v", err)
-	}
+	svc := data.NewDataUploadService()
 
-	http.HandleFunc("/start", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+	endpoints := data.NewEndpoints(svc)
 
-		initialState := ai.GraphState{
-			EmailsInfo:         []gmail.EmailInfo{},
-			CurrentEmailInfo:   gmail.EmailInfo{},
-			EmailCategory:      "",
-			GeneratedEmail:     "",
-			RAGQueries:         []string{},
-			RetrievedDocuments: "",
-			WriterMessages:     []string{},
-			Sendable:           false,
-			Trials:             0,
-		}
+	r := mux.NewRouter()
+	data.MakeHTTPHandler(r, endpoints)
 
-		initialState.EmailsInfo = append(initialState.EmailsInfo, gmail.EmailInfo{
-			ID: "mock_id_1", ThreadID: "mock_thread_1", MessageID: "mock_msg_1",
-			Sender: "test@example.com", Subject: "Inquiry about product A",
-			Body: "Hi team, I have a question about the features of product A. Could you clarify its compatibility?",
-		})
-
-		workflowCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-
-		finalState, err := workflowApp.Graph.Execute(workflowCtx, initialState, 100) // Max 100 steps
-		if err != nil {
-			log.Printf("Workflow failed to run: %v", err)
-			http.Error(w, fmt.Sprintf("Workflow failed: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{"final_state": finalState}); err != nil {
-			log.Printf("Failed to encode response: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-	})
+	serveWebBuild(r, "./web/dist")
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "8081"
 	}
-	addr := fmt.Sprintf("0.0.0.0:%s", port)
-	log.Printf("Server starting on %s. Send GET requests to /start.", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+
+	addr := fmt.Sprintf(":%s", port)
+	log.Printf("File upload service starting on %s", addr)
+
+	if err := http.ListenAndServe(addr, r); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func serveWebBuild(router *mux.Router, staticFilesPath string) {
+	router.PathPrefix("/static/").Handler(http.FileServer(http.Dir(staticFilesPath)))
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir(staticFilesPath)))
+	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("Serving web for path: %s (NotFoundHandler)", r.URL.Path)
+		http.ServeFile(w, r, filepath.Join(staticFilesPath, "index.html"))
+	})
 }

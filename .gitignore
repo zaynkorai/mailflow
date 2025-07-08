@@ -32,3 +32,6 @@ token.json
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# dependencies
+/web/node_modules

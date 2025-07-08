@@ -1,4 +1,4 @@
-module github.com/zaynkorai/mailflow
+module mailflow
 
 go 1.24.3
 
@@ -7,6 +7,7 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/google/generative-ai-go v0.20.1
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/viper v1.20.1
 	golang.org/x/oauth2 v0.30.0
@@ -29,7 +30,6 @@ require (
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.14.2 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect

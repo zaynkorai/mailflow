@@ -3,6 +3,7 @@ package data
 import (
 	"fmt"
 	"io"
+	"mailflow/pkg/logging"
 	"mime/multipart"
 	"os"
 	"path/filepath"
@@ -55,12 +56,22 @@ func (s *dataUploadService) ListFiles() ([]FileInfo, error) {
 	var files []FileInfo
 	for _, entry := range entries {
 		if !entry.IsDir() {
+			info, err := entry.Info()
+			if err != nil {
+				logging.Error("Failed to get file info for %s: %v", entry.Name(), err)
+				continue
+			}
 			fileName := entry.Name()
 			fileExtension := filepath.Ext(fileName)
 			if len(fileExtension) > 0 && fileExtension[0] == '.' {
 				fileExtension = fileExtension[1:]
 			}
-			files = append(files, FileInfo{Name: fileName, Extension: fileExtension})
+			files = append(files, FileInfo{
+				Name:       fileName,
+				Extension:  fileExtension,
+				Size:       info.Size(),
+				UploadTime: info.ModTime(), // Using ModTime as upload time for simplicity
+			})
 		}
 	}
 	return files, nil

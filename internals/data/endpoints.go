@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"mime/multipart"
+	"time"
 )
 
 type Endpoints struct {
@@ -55,6 +56,8 @@ func (r UploadFileResponse) Error() string {
 type ListFilesRequest struct{}
 
 type FileInfo struct {
-	Name      string `json:"name"`
-	Extension string `json:"extension"`
+	Name       string    `json:"name"`
+	Extension  string    `json:"extension"`
+	Size       int64     `json:"size"`
+	UploadTime time.Time `json:"upload_time"`
 }

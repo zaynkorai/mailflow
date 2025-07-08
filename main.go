@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/zaynkorai/mailflow/ai"
+	"github.com/zaynkorai/mailflow/internals/ai"
 	"github.com/zaynkorai/mailflow/util/gmail"
 )
 

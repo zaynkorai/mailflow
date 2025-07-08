@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/zaynkorai/mailflow/prompts"
+	"github.com/zaynkorai/mailflow/internals/prompts"
 )
 
 type Agents struct {

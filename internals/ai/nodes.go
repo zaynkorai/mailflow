@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/zaynkorai/mailflow/util/gmail"
+	"github.com/zaynkorai/mailflow/internals/email/gmail"
 )
 
 type Nodes struct {

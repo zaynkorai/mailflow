@@ -1,6 +1,6 @@
 package ai
 
-import "github.com/zaynkorai/mailflow/util/gmail"
+import "github.com/zaynkorai/mailflow/internals/email/gmail"
 
 type GraphState struct {
 	EmailsInfo         []gmail.EmailInfo // List of emails to process

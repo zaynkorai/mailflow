@@ -3,7 +3,7 @@
 
 
 -----
-Note: Last stable code version is available in branch 0.9: [Click Here](https://github.com/zaynkorai/mailflow/tree/0.9)
+Note: Last stable code version is available at branch 0.9: [Click Here](https://github.com/zaynkorai/mailflow/tree/0.9)
 
 ## **Introduction**
 

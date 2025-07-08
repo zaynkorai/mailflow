@@ -3,235 +3,111 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"io/ioutil"
+	"mailflow/internals/config"
+	"mailflow/internals/llm"
+	"mailflow/internals/rag"
+	"mailflow/internals/rag/adapter"
+	"mailflow/pkg/logging"
 	"math"
-	"os"
-	"strings"
-
-	"github.com/google/generative-ai-go/genai"
-	"google.golang.org/api/option"
+	"time"
 )
 
-const RAG_SEARCH_PROMPT_TEMPLATE = `
-	Using the following pieces of retrieved context, answer the question comprehensively and concisely.
-	Ensure your response fully addresses the question based on the given context.
-
-	**IMPORTANT:**
-	Just provide the answer and never mention or refer to having access to the external context or information in your answer.
-	If you are unable to determine the answer from the provided context, state 'I don't know.'
-
-	Question: %s
-	Context: %s
-	`
-
-type Document struct {
-	Content   string
-	Embedding []float32
-}
-
-// SimpleVectorStore is a basic in-memory vector store for demonstration.
-// In a production environment, you'd use a dedicated vector database like ChromaDB, Pinecone, Weaviate, etc.
-type SimpleVectorStore struct {
-	docs           []Document
-	embeddingModel *genai.EmbeddingModel
-	genaiClient    *genai.Client
-}
-
-// Creates a new in-memory vector store.
-func NewSimpleVectorStore(ctx context.Context, geminiAPIKey string) (*SimpleVectorStore, error) {
-	client, err := genai.NewClient(ctx, option.WithAPIKey(geminiAPIKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to create GenAI client: %w", err)
-	}
-
-	embeddingModel := client.EmbeddingModel("models/text-embedding-004")
-	return &SimpleVectorStore{
-		docs:           []Document{},
-		embeddingModel: embeddingModel,
-		genaiClient:    client,
-	}, nil
-}
-
-func (s *SimpleVectorStore) Close() {
-	if s.genaiClient != nil {
-		s.genaiClient.Close() // Closes the underlying GenAI client used by the embedding model.
-
-	}
-}
-
-// AddDocument adds a document (chunk) to the vector store after embedding its content.
-func (s *SimpleVectorStore) AddDocument(ctx context.Context, content string) error {
-	resp, err := s.embeddingModel.EmbedContent(ctx, genai.Text(content)) // Use embeddingModel
-	if err != nil {
-		return fmt.Errorf("failed to embed content: %w", err)
-	}
-
-	if resp.Embedding == nil || len(resp.Embedding.Values) == 0 {
-		return fmt.Errorf("no embedding values returned for content")
-	}
-	embedding := resp.Embedding.Values
-	s.docs = append(s.docs, Document{Content: content, Embedding: embedding})
-	return nil
-}
-
-// CosineSimilarity calculates the cosine similarity between two vectors.
-func CosineSimilarity(vec1, vec2 []float32) float64 {
-	dotProduct := 0.0
-	magnitude1 := 0.0
-	magnitude2 := 0.0
-
-	for i := 0; i < len(vec1); i++ {
-		dotProduct += float64(vec1[i] * vec2[i])
-		magnitude1 += float64(vec1[i] * vec1[i])
-		magnitude2 += float64(vec2[i] * vec2[i])
-	}
-
-	if magnitude1 == 0 || magnitude2 == 0 {
-		return 0.0 // Avoid division by zero
-	}
-
-	return dotProduct / (math.Sqrt(magnitude1) * math.Sqrt(magnitude2))
-}
-
-// Retrieve performs a semantic search on the vector store and returns the topN most similar documents.
-func (s *SimpleVectorStore) Retrieve(ctx context.Context, query string, topN int) ([]Document, error) {
-	queryResp, err := s.embeddingModel.EmbedContent(ctx, genai.Text(query))
-	if err != nil {
-		return nil, fmt.Errorf("failed to embed query: %w", err)
-	}
-
-	if queryResp.Embedding == nil || len(queryResp.Embedding.Values) == 0 {
-		return nil, fmt.Errorf("no embedding values returned for query")
-	}
-	queryEmbedding := queryResp.Embedding.Values
-
-	type ScoredDocument struct {
-		Document Document
-		Score    float64
-	}
-	var scoredDocs []ScoredDocument
-	for _, doc := range s.docs {
-		score := CosineSimilarity(queryEmbedding, doc.Embedding)
-		scoredDocs = append(scoredDocs, ScoredDocument{Document: doc, Score: score})
-	}
-
-	for i := 0; i < len(scoredDocs)-1; i++ {
-		for j := i + 1; j < len(scoredDocs); j++ {
-			if scoredDocs[i].Score < scoredDocs[j].Score {
-				scoredDocs[i], scoredDocs[j] = scoredDocs[j], scoredDocs[i]
-			}
-		}
-	}
-
-	if len(scoredDocs) > topN {
-		returnDocs := make([]Document, topN)
-		for i := 0; i < topN; i++ {
-			returnDocs[i] = scoredDocs[i].Document
-		}
-		return returnDocs, nil
-	}
-
-	returnDocs := make([]Document, len(scoredDocs))
-	for i, sd := range scoredDocs {
-		returnDocs[i] = sd.Document
-	}
-	return returnDocs, nil
-}
-
-func TextChunker(text string, chunkSize, chunkOverlap int) []string {
-	var chunks []string
-	if len(text) == 0 {
-		return chunks
-	}
-
-	// A simple character-based chunking. For more robust splitting (e.g., by sentences, paragraphs),
-	// a more sophisticated logic or a dedicated library would be needed.
-	for i := 0; i < len(text); i += (chunkSize - chunkOverlap) {
-		end := i + chunkSize
-		if end > len(text) {
-			end = len(text)
-		}
-		chunks = append(chunks, text[i:end])
-		if end == len(text) {
-			break
-		}
-	}
-	return chunks
-}
+const agencyDataPath = "internals/data/agency.txt"
 
 func main() {
+	logging.InitLogger()
+	logging.Info("Starting RAG Indexer...")
 
-	geminiAPIKey := os.Getenv("GOOGLE_API_KEY")
-	if geminiAPIKey == "" {
-		log.Fatal("GOOGLE_API_KEY environment variable not set.")
-	}
-
-	ctx := context.Background()
-
-	llmClient, err := genai.NewClient(ctx, option.WithAPIKey(geminiAPIKey))
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to create GenAI client for LLM: %v", err)
+		logging.Fatal("Failed to load configuration: %v", err)
 	}
-	defer llmClient.Close()
-	llm := llmClient.GenerativeModel("gemini-2.0-flash")
-	llm.SetTemperature(0.1)
+	logging.Info("Configuration loaded successfully. Google API Key: %s (first 5 chars)", cfg.GoogleAPIKey[:5])
 
-	vectorstore, err := NewSimpleVectorStore(ctx, geminiAPIKey)
+	agencyContent, err := ioutil.ReadFile(agencyDataPath)
 	if err != nil {
-		log.Fatalf("Failed to create simple vector store: %v", err)
+		logging.Fatal("Failed to read agency data file '%s': %v", agencyDataPath, err)
 	}
-	defer vectorstore.Close()
+	logging.Info("Successfully read %d bytes from %s.", len(agencyContent), agencyDataPath)
 
-	fmt.Println("Loading & Chunking Docs...")
-	docContent, err := os.ReadFile("./data/agency.txt")
+	chunker := rag.NewSimpleTextChunker(rag.DefaultChunkSize, rag.DefaultChunkOverlap)
+
+	geminiEmbedder := llm.NewGeminiEmbedder(cfg.GoogleAPIKey)
+	vectorStore := adapter.NewInMemoryVectorStore()
+
+	ragSystem := rag.NewRAGSystem(chunker, geminiEmbedder, vectorStore)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	doc := rag.Document{
+		ID:        "agency-knowledge-base-v1",
+		Source:    agencyDataPath,
+		Content:   string(agencyContent),
+		CreatedAt: time.Now(),
+	}
+
+	err = ragSystem.IndexDocument(ctx, doc)
 	if err != nil {
-		log.Fatalf("Failed to read document file: %v", err)
+		logging.Fatal("Failed to index agency document: %v", err)
 	}
 
-	docChunks := TextChunker(string(docContent), 300, 50)
-	fmt.Printf("Split into %d chunks.\n", len(docChunks))
+	logging.Info("RAG Indexer finished indexing data. Total chunks in store: %d", vectorStore.GetTotalChunks())
 
-	fmt.Println("Creating vector embeddings & storing in memory...")
-	for i, chunk := range docChunks {
-		err := vectorstore.AddDocument(ctx, chunk)
-		if err != nil {
-			log.Fatalf("Failed to add chunk %d to vector store: %v", i, err)
-		}
-	}
-	fmt.Println("Vector embeddings created and stored.")
-
-	fmt.Println("Test RAG chain...")
-	query := "What are your pricing options?"
-
-	retrievedDocs, err := vectorstore.Retrieve(ctx, query, 3) // Retrieve top 3 documents
+	fmt.Println("\n--- Demonstrating RAG Retrieval ---")
+	query := "What services does the agency provide?"
+	retrievedChunks, err := ragSystem.Retrieve(ctx, query, 3)
 	if err != nil {
-		log.Fatalf("Failed to retrieve documents: %v", err)
-	}
-
-	var contextBuilder strings.Builder
-	for i, doc := range retrievedDocs {
-		contextBuilder.WriteString(fmt.Sprintf("--- Chunk %d ---\n%s\n", i+1, doc.Content))
-	}
-	context := contextBuilder.String()
-
-	promptText := fmt.Sprintf(RAG_SEARCH_PROMPT_TEMPLATE, query, context)
-
-	resp, err := llm.GenerateContent(ctx, genai.Text(promptText))
-	if err != nil {
-		log.Fatalf("Failed to generate content from LLM: %v", err)
-	}
-
-	var answer string
-	if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil && len(resp.Candidates[0].Content.Parts) > 0 {
-		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			answer = string(text)
-		} else {
-			answer = "I don't know (LLM response part is not text)."
-		}
+		logging.Error("Failed to retrieve chunks: %v", err)
 	} else {
-		answer = "I don't know (no valid response from LLM)."
+		logging.Info("Retrieved %d chunks for query '%s':", len(retrievedChunks), query)
+		for i, chunk := range retrievedChunks {
+			fmt.Printf("Chunk %d (ID: %s, Score: %.4f):\n---\n%s\n---\n", i+1, chunk.ID, calculateSimilarity(query, chunk.Content, geminiEmbedder), chunk.Content)
+		}
+	}
+}
+
+// calculateSimilarity is a helper function to demonstrate similarity for display purposes.
+// In a real scenario, the score would come directly from the vector store search.
+func calculateSimilarity(text1, text2 string, embedder rag.Embedder) float64 {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	emb1, err := embedder.Embed(ctx, text1)
+	if err != nil {
+		logging.Error("Error embedding text1 for similarity calculation: %v", err)
+		return 0.0
+	}
+	emb2, err := embedder.Embed(ctx, text2)
+	if err != nil {
+		logging.Error("Error embedding text2 for similarity calculation: %v", err)
+		return 0.0
 	}
 
-	fmt.Printf("Question: %s\n", query)
-	fmt.Printf("Answer: %s\n", answer)
+	return cosineSimilarity(emb1, emb2)
+}
+
+// cosineSimilarity calculates the cosine similarity between two vectors.
+// This is duplicated from inmemory.go for demonstration in main.
+func cosineSimilarity(vecA, vecB []float32) float64 {
+	if len(vecA) != len(vecB) {
+		return 0.0
+	}
+
+	var dotProduct float64
+	var normA float64
+	var normB float64
+
+	for i := 0; i < len(vecA); i++ {
+		dotProduct += float64(vecA[i] * vecB[i])
+		normA += float64(vecA[i] * vecA[i])
+		normB += float64(vecB[i] * vecB[i])
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0.0
+	}
+
+	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
 }

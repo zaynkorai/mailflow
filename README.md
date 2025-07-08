@@ -3,6 +3,7 @@
 
 
 -----
+Note: Last stable code version is available in branch 0.9: [Click Here](https://github.com/zaynkorai/mailflow/tree/0.9)
 
 ## **Introduction**
 
@@ -121,6 +122,6 @@ Contributions are welcome\! Please open an issue or submit a pull request for an
 ### Contact
 
 If you have any questions or suggestions, feel free to contact me at `zaynulabdin313@gmail.com`.
-PS: This is inpired from [kaymen99's](https://github.com/kaymen99) Python work.
+
 
 -----

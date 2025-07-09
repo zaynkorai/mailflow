@@ -3,7 +3,6 @@ import { useState, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
-import Button from '@mui/material/Button';
 import TableBody from '@mui/material/TableBody';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
@@ -12,26 +11,25 @@ import TablePagination from '@mui/material/TablePagination';
 import { _users } from 'src/_mock';
 import { DashboardContent } from 'src/layouts/dashboard';
 
-import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 
 import { TableNoData } from '../table-no-data';
-import { UserTableRow } from '../user-table-row';
-import { UserTableHead } from '../user-table-head';
+import { InboxTableRow } from '../inbox-table-row';
+import { InboxTableHead } from '../inbox-table-head';
 import { TableEmptyRows } from '../table-empty-rows';
-import { UserTableToolbar } from '../user-table-toolbar';
+import { InboxTableToolbar } from '../inbox-table-toolbar';
 import { emptyRows, applyFilter, getComparator } from '../utils';
 
-import type { UserProps } from '../user-table-row';
+import type { InboxProps } from '../inbox-table-row';
 
 // ----------------------------------------------------------------------
 
-export function UserView() {
+export function InboxView() {
   const table = useTable();
 
   const [filterName, setFilterName] = useState('');
 
-  const dataFiltered: UserProps[] = applyFilter({
+  const dataFiltered: InboxProps[] = applyFilter({
     inputData: _users,
     comparator: getComparator(table.order, table.orderBy),
     filterName,
@@ -49,19 +47,12 @@ export function UserView() {
         }}
       >
         <Typography variant="h4" sx={{ flexGrow: 1 }}>
-          Users
+          Inbox
         </Typography>
-        <Button
-          variant="contained"
-          color="inherit"
-          startIcon={<Iconify icon="mingcute:add-line" />}
-        >
-          New user
-        </Button>
       </Box>
 
       <Card>
-        <UserTableToolbar
+        <InboxTableToolbar
           numSelected={table.selected.length}
           filterName={filterName}
           onFilterName={(event: React.ChangeEvent<HTMLInputElement>) => {
@@ -73,7 +64,7 @@ export function UserView() {
         <Scrollbar>
           <TableContainer sx={{ overflow: 'unset' }}>
             <Table sx={{ minWidth: 800 }}>
-              <UserTableHead
+              <InboxTableHead
                 order={table.order}
                 orderBy={table.orderBy}
                 rowCount={_users.length}
@@ -87,10 +78,7 @@ export function UserView() {
                 }
                 headLabel={[
                   { id: 'name', label: 'Name' },
-                  { id: 'company', label: 'Company' },
-                  { id: 'role', label: 'Role' },
-                  { id: 'isVerified', label: 'Verified', align: 'center' },
-                  { id: 'status', label: 'Status' },
+                  { id: 'message', label: 'Message' },
                   { id: '' },
                 ]}
               />
@@ -101,7 +89,7 @@ export function UserView() {
                     table.page * table.rowsPerPage + table.rowsPerPage
                   )
                   .map((row) => (
-                    <UserTableRow
+                    <InboxTableRow
                       key={row.id}
                       row={row}
                       selected={table.selected.includes(row.id)}
@@ -126,7 +114,7 @@ export function UserView() {
           count={_users.length}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[25, 50, 100]}
           onRowsPerPageChange={table.onChangeRowsPerPage}
         />
       </Card>
@@ -139,7 +127,7 @@ export function UserView() {
 export function useTable() {
   const [page, setPage] = useState(0);
   const [orderBy, setOrderBy] = useState('name');
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [selected, setSelected] = useState<string[]>([]);
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
 

@@ -15,23 +15,20 @@ import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
-export type UserProps = {
+export type InboxProps = {
   id: string;
   name: string;
-  role: string;
-  status: string;
-  company: string;
+  message: string;
   avatarUrl: string;
-  isVerified: boolean;
 };
 
-type UserTableRowProps = {
-  row: UserProps;
+type InboxTableRowProps = {
+  row: InboxProps;
   selected: boolean;
   onSelectRow: () => void;
 };
 
-export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
+export function InboxTableRow({ row, selected, onSelectRow }: InboxTableRowProps) {
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -62,21 +59,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           </Box>
         </TableCell>
 
-        <TableCell>{row.company}</TableCell>
-
-        <TableCell>{row.role}</TableCell>
-
-        <TableCell align="center">
-          {row.isVerified ? (
-            <Iconify width={22} icon="solar:check-circle-bold" sx={{ color: 'success.main' }} />
-          ) : (
-            '-'
-          )}
-        </TableCell>
-
-        <TableCell>
-          <Label color={(row.status === 'banned' && 'error') || 'success'}>{row.status}</Label>
-        </TableCell>
+        <TableCell>{row.message}</TableCell>
 
         <TableCell align="right">
           <IconButton onClick={handleOpenPopover}>
